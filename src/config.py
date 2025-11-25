@@ -18,6 +18,7 @@ class Settings(BaseSettings):
     
     # Azure AI Foundry
     AZURE_AI_PROJECT_ENDPOINT: str
+    AZURE_AI_PROJECT_NAME: str = "it-service-desk-project"
     AZURE_AI_MODEL_DEPLOYMENT: str = "gpt-5"
     AZURE_TENANT_ID: str
     AZURE_SUBSCRIPTION_ID: str
