@@ -134,6 +134,8 @@ def register_default_agents(router: AgentRouter, settings) -> None:
     
     # Import concrete agents
     from ..agents.identity_agent import IdentityAgent
+    from ..agents.device_agent import DeviceAgent
+    from ..agents.ticket_agent import TicketAgent
     
     # Instantiate integration clients
     ps_executor = PowerShellExecutor(base_script_path=settings.ps_script_path)
@@ -157,15 +159,14 @@ def register_default_agents(router: AgentRouter, settings) -> None:
     snow_tools = ServiceNowTools(snow_client)
     intune_tools = IntuneDeviceTools(graph_client)
     
-    # Instantiate and register agents
+    # Instantiate and register all agents
     identity_agent = IdentityAgent(ad_tools, graph_tools)
     router.register_agent(identity_agent)
     
-    logger.info(f"Registered {len(router.get_available_intents())} intents across agents")
+    device_agent = DeviceAgent(intune_tools)
+    router.register_agent(device_agent)
     
-    # TODO: Add more agents as they're implemented
-    # device_agent = DeviceAgent(intune_tools)
-    # router.register_agent(device_agent)
-    #
-    # ticket_agent = TicketAgent(snow_tools)
-    # router.register_agent(ticket_agent)
+    ticket_agent = TicketAgent(snow_tools)
+    router.register_agent(ticket_agent)
+    
+    logger.info(f"Registered {len(router.get_available_intents())} intents across 3 agents")

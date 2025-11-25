@@ -42,9 +42,15 @@ src/it_service_desk_agent/
 │   ├── microsoft_graph.py         # Graph API client
 │   ├── servicenow.py              # ServiceNow client
 │   └── powershell.py              # PowerShell executor
-├── tools/                         # Domain-specific operations (TBD)
-└── agents/                        # Concrete agent implementations (TBD)
-    └── identity_agent.py          # Example: IdentityAgent
+├── tools/
+│   ├── active_directory.py        # AD operations (8 methods)
+│   ├── graph_user.py              # Azure AD operations (7 methods)
+│   ├── servicenow_tools.py        # ServiceNow operations (7 methods)
+│   └── intune_tools.py            # Intune device operations (5 methods)
+└── agents/
+    ├── identity_agent.py          # Identity management (6 intents)
+    ├── device_agent.py            # Device management (5 intents)
+    └── ticket_agent.py            # Ticket management (5 intents)
 
 tests/
 ├── test_router.py                 # Router unit tests (mocked)
@@ -103,27 +109,50 @@ AZURE_AI_MODEL_DEPLOYMENT=gpt-4o
 
 ## Usage
 
+### Quick Start
+
+See `examples/demo_usage.py` for comprehensive examples of all operations.
+
 ### As Azure AI Foundry Handler
 
 ```python
-from it_service_desk_agent.entrypoint import handle_request
+from it_service_desk_agent import handle_request
+from it_service_desk_agent.core.models import RequestContext
 
-# Request from Azure AI Foundry
-payload = {
-    "intent": "identity.user.lookup",
-    "parameters": {"username": "user@example.com"},
-    "context": {
-        "user_id": "admin@example.com",
-        "source": "teams",
-        "correlation_id": "abc-123",
-        "risk_level": "low",
-        "approval_granted": False
-    }
-}
+# Identity operations
+response = await handle_request(
+    intent="identity.user.lookup",
+    parameters={
+        "username": "john.doe",
+        "include_groups": True,
+        "include_licenses": True
+    },
+    context=RequestContext(
+        user_id="admin@example.com",
+        session_id="session-123",
+        request_id="req-001"
+    )
+)
+print(response.success)  # True
+print(response.result)   # User details from AD + Azure AD
 
-response = handle_request(payload)
-print(response["success"])  # True
-print(response["data"])     # User details
+# Device operations
+response = await handle_request(
+    intent="device.sync",
+    parameters={"device_id": "device-guid-123"},
+    context=context
+)
+
+# Ticket operations
+response = await handle_request(
+    intent="ticket.create",
+    parameters={
+        "short_description": "Password reset request",
+        "description": "User unable to login after vacation",
+        "priority": "high"
+    },
+    context=context
+)
 ```
 
 ### Direct Router Usage
@@ -218,32 +247,50 @@ RUN_INTEGRATION_TESTS=1 pytest integration_tests/ -v
 
 ## Development Status
 
-### ✅ Completed
+### ✅ Completed (PHASES 1-7)
 
-- Core abstractions (Agent protocol, models)
-- Intent-based router with fail-fast duplicate detection
-- Security layer with RBAC + audit logging (20+ policies)
-- Integration clients (Graph, ServiceNow, PowerShell base)
-- Configuration management (Pydantic Settings)
-- Unit tests for router and security (mocked)
-- Package structure and installability
+- **PHASE 1-4: Core Foundation**
+  - Core abstractions (Agent protocol, models)
+  - Intent-based router with fail-fast duplicate detection
+  - Security layer with RBAC + audit logging (20+ policies)
+  - Integration clients (Graph, ServiceNow, PowerShell)
+  - Configuration management (Pydantic Settings)
 
-### 🚧 In Progress
+- **PHASE 5-7: Tool Layer & Agents**
+  - Tool layer complete (4 classes, ~850 lines)
+    - `ActiveDirectoryTools`: 8 methods (user info, password reset, unlock, LAPS, BitLocker)
+    - `GraphUserTools`: 7 methods (profiles, groups, licenses)
+    - `ServiceNowTools`: 7 methods (incidents, KB search, normalization)
+    - `IntuneDeviceTools`: 5 methods (device management, sync, restart, wipe)
+  - Agent implementations complete (3 agents, 16 intents)
+    - `IdentityAgent`: 6 intents (user lookup, password reset, unlock, devices, licenses)
+    - `DeviceAgent`: 5 intents (get, list, sync, restart, wipe)
+    - `TicketAgent`: 5 intents (search, create, update, resolve, KB search)
+  - Full wiring in `register_default_agents()`: clients → tools → agents → router
 
-- Tool layer (ActiveDirectoryTools, GraphUserTools, etc.)
-- Concrete agents (IdentityAgent partially implemented)
-- Integration layer completion
-- Integration tests
+- **PHASE 8: Security & Audit**
+  - Authorization checks on all sensitive operations
+  - Audit logging with 25+ event types
+  - RBAC policy enforcement
 
-### ❌ Not Implemented
+- **PHASE 9: Testing**
+  - Unit tests for router and security (mocked, 16 tests)
+  - Integration tests separated with environment guard
+  - Package structure and installability
 
-- Agent registration in `register_default_agents()`
-- Tool implementations wrapping integrations
-- Complete agent implementations (DeviceAgent, TicketAgent, etc.)
+- **PHASE 10: Documentation**
+  - Comprehensive README with examples
+  - Example usage script (`examples/demo_usage.py`)
+  - Integration test README with best practices
+  - Inline code documentation
+
+### ❌ Not Implemented (Future Enhancements)
+
 - Key Vault integration (secrets.py has TODO)
 - Rate limiting and retry logic
 - API server (FastAPI wrapper)
 - Deployment configs (Docker, Kubernetes, Terraform)
+- Additional agents (KnowledgeAgent, AutomationAgent, etc.)
 
 ## What's Different from Previous Versions
 
