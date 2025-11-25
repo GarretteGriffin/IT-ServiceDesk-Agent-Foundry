@@ -1,0 +1,82 @@
+# .aifignore - Files to exclude from Azure AI Foundry upload
+
+# Python artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
+venv/
+ENV/
+env/
+.venv
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Version control
+.git/
+.gitignore
+.gitattributes
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Test files (optional - include if you want tests deployed)
+tests/
+integration_tests/
+.pytest_cache/
+.coverage
+htmlcov/
+*.cover
+
+# Documentation (optional - include what you need)
+archive/
+docs/
+*.md
+!README.md
+!AZURE_DEPLOYMENT.md
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+azure-pipelines.yml
+
+# Logs
+*.log
+logs/
+
+# OS files
+Thumbs.db
+.DS_Store
+
+# Large files that aren't needed at runtime
+examples/
+*.csv
+*.xlsx
+*.zip
+*.tar.gz

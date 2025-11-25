@@ -1,0 +1,365 @@
+$schema: https://azuremlschemas.azureedge.net/latest/agentBlueprint.schema.json
+name: it-service-desk-agent
+display_name: IT Service Desk Agent
+description: Enterprise IT Service Desk agent with identity, device, and ticket management capabilities
+type: custom
+version: 1.0.0
+
+# Agent metadata
+tags:
+  - it-helpdesk
+  - identity-management
+  - device-management
+  - servicenow
+  - active-directory
+  - intune
+
+# Runtime configuration
+runtime:
+  type: python
+  version: "3.10"
+  entry_point: src.it_service_desk_agent.entrypoint:handle_request
+
+# Capabilities this agent provides
+capabilities:
+  # Identity Management (6 capabilities)
+  - name: lookup_user
+    intent: identity.user.lookup
+    description: Look up user information from Active Directory and Azure AD
+    parameters:
+      - name: username
+        type: string
+        required: true
+        description: Username or email address
+      - name: include_groups
+        type: boolean
+        required: false
+        default: false
+        description: Include group memberships
+      - name: include_licenses
+        type: boolean
+        required: false
+        default: false
+        description: Include Azure AD licenses
+
+  - name: reset_password
+    intent: identity.password.reset
+    description: Reset user password (requires approval)
+    parameters:
+      - name: username
+        type: string
+        required: true
+      - name: temporary_password
+        type: string
+        required: true
+      - name: must_change
+        type: boolean
+        required: false
+        default: true
+
+  - name: unlock_account
+    intent: identity.account.unlock
+    description: Unlock locked user account
+    parameters:
+      - name: username
+        type: string
+        required: true
+
+  - name: get_user_devices
+    intent: identity.user.devices
+    description: Get list of devices assigned to user
+    parameters:
+      - name: username
+        type: string
+        required: true
+
+  - name: assign_license
+    intent: identity.license.assign
+    description: Assign Azure AD license to user (requires approval)
+    parameters:
+      - name: username
+        type: string
+        required: true
+      - name: sku_id
+        type: string
+        required: true
+        description: License SKU ID (e.g., SPE_E3)
+
+  - name: remove_license
+    intent: identity.license.remove
+    description: Remove Azure AD license from user (requires approval)
+    parameters:
+      - name: username
+        type: string
+        required: true
+      - name: sku_id
+        type: string
+        required: true
+
+  # Device Management (5 capabilities)
+  - name: get_device
+    intent: device.get
+    description: Get details for a specific device
+    parameters:
+      - name: device_id
+        type: string
+        required: true
+
+  - name: list_devices
+    intent: device.list
+    description: List devices with optional filtering
+    parameters:
+      - name: user_upn
+        type: string
+        required: false
+      - name: os_type
+        type: string
+        required: false
+        description: Filter by OS (Windows, iOS, Android)
+      - name: compliance_state
+        type: string
+        required: false
+        description: Filter by compliance (compliant, noncompliant)
+      - name: limit
+        type: integer
+        required: false
+        default: 50
+
+  - name: sync_device
+    intent: device.sync
+    description: Trigger Intune sync for device
+    parameters:
+      - name: device_id
+        type: string
+        required: true
+
+  - name: restart_device
+    intent: device.restart
+    description: Remotely restart device (requires approval)
+    parameters:
+      - name: device_id
+        type: string
+        required: true
+
+  - name: wipe_device
+    intent: device.wipe
+    description: DESTRUCTIVE - Wipe device (requires explicit approval)
+    parameters:
+      - name: device_id
+        type: string
+        required: true
+
+  # Ticket Management (5 capabilities)
+  - name: search_incidents
+    intent: ticket.search
+    description: Search ServiceNow incidents
+    parameters:
+      - name: query
+        type: string
+        required: false
+      - name: assigned_to
+        type: string
+        required: false
+      - name: state
+        type: string
+        required: false
+      - name: priority
+        type: string
+        required: false
+      - name: limit
+        type: integer
+        required: false
+        default: 20
+
+  - name: create_incident
+    intent: ticket.create
+    description: Create new ServiceNow incident (requires approval)
+    parameters:
+      - name: short_description
+        type: string
+        required: true
+      - name: description
+        type: string
+        required: true
+      - name: priority
+        type: string
+        required: false
+        default: medium
+      - name: caller_id
+        type: string
+        required: false
+      - name: assignment_group
+        type: string
+        required: false
+
+  - name: update_incident
+    intent: ticket.update
+    description: Update existing incident (requires approval)
+    parameters:
+      - name: incident_number
+        type: string
+        required: true
+      - name: work_notes
+        type: string
+        required: false
+      - name: state
+        type: string
+        required: false
+      - name: priority
+        type: string
+        required: false
+
+  - name: resolve_incident
+    intent: ticket.resolve
+    description: Resolve incident with notes (requires approval)
+    parameters:
+      - name: incident_number
+        type: string
+        required: true
+      - name: resolution_notes
+        type: string
+        required: true
+
+  - name: search_knowledge
+    intent: ticket.kb_search
+    description: Search ServiceNow knowledge base
+    parameters:
+      - name: query
+        type: string
+        required: true
+      - name: limit
+        type: integer
+        required: false
+        default: 10
+
+# Environment variables required
+environment:
+  variables:
+    # Microsoft Graph
+    - name: GRAPH_TENANT_ID
+      description: Azure AD tenant ID
+      required: true
+      secret: false
+    
+    - name: GRAPH_CLIENT_ID
+      description: App registration client ID
+      required: true
+      secret: false
+    
+    - name: GRAPH_CLIENT_SECRET
+      description: App registration client secret
+      required: true
+      secret: true
+    
+    - name: GRAPH_BASE_URL
+      description: Graph API base URL
+      required: false
+      default: "https://graph.microsoft.com/v1.0"
+      secret: false
+    
+    # ServiceNow
+    - name: SERVICENOW_INSTANCE_URL
+      description: ServiceNow instance URL
+      required: true
+      secret: false
+    
+    - name: SERVICENOW_USERNAME
+      description: ServiceNow username
+      required: true
+      secret: false
+    
+    - name: SERVICENOW_PASSWORD
+      description: ServiceNow password
+      required: true
+      secret: true
+    
+    # Active Directory
+    - name: AD_DOMAIN
+      description: Active Directory domain
+      required: true
+      secret: false
+    
+    - name: AD_SERVER
+      description: Active Directory server hostname
+      required: false
+      secret: false
+    
+    - name: AD_BASE_DN
+      description: Active Directory base DN
+      required: false
+      secret: false
+    
+    - name: PS_SCRIPT_PATH
+      description: PowerShell script base path
+      required: false
+      default: "./scripts"
+      secret: false
+
+# Dependencies
+dependencies:
+  python:
+    - pydantic>=2.0.0
+    - pydantic-settings>=2.0.0
+    - python-dotenv>=1.0.0
+    - httpx>=0.25.0
+    - azure-identity>=1.15.0
+    - azure-core>=1.29.0
+
+# Security and compliance
+security:
+  rbac:
+    enabled: true
+    policies:
+      - operation: identity.password.reset
+        required_roles: [it_helpdesk, it_admin]
+        risk_level: medium
+        approval_required: true
+      
+      - operation: identity.license.assign
+        required_roles: [it_admin]
+        risk_level: medium
+        approval_required: true
+      
+      - operation: device.restart
+        required_roles: [it_helpdesk, it_admin]
+        risk_level: medium
+        approval_required: true
+      
+      - operation: device.wipe
+        required_roles: [it_admin]
+        risk_level: critical
+        approval_required: true
+      
+      - operation: ticket.create
+        required_roles: [it_helpdesk, it_admin]
+        risk_level: low
+        approval_required: true
+  
+  audit:
+    enabled: true
+    log_all_operations: true
+    sensitive_operations:
+      - identity.password.reset
+      - identity.license.assign
+      - identity.license.remove
+      - device.restart
+      - device.wipe
+      - ticket.create
+      - ticket.update
+      - ticket.resolve
+
+# Model configuration (optional - if using LLM orchestration)
+model:
+  type: openai
+  deployment: gpt-4o
+  temperature: 0.1
+  max_tokens: 4000
+  top_p: 0.95
+
+# Logging configuration
+logging:
+  level: INFO
+  format: json
+  destinations:
+    - azure_monitor
+    - application_insights
