@@ -484,63 +484,55 @@ class GraphTool:
             return f"Failed to list licenses: {str(e)}"
     
     async def _graph_call(self, method: str, endpoint: str, data: Optional[Dict] = None, params: Optional[Dict] = None) -> Any:
-        """Make Microsoft Graph API call with OAuth2 auth, token caching, retry logic, and rate limiting."""
-        # Placeholder - in production use actual Graph API
-        await asyncio.sleep(0.1)
+        """Make Microsoft Graph API call with real httpx client"""
+        import httpx
+        from azure.identity.aio import ClientSecretCredential
         
-        # Simulate responses
-        if "/users/" in endpoint and method == "GET" and "/memberOf" in endpoint:
-            return [
-                {"id": "group1", "displayName": "IT Support"},
-                {"id": "group2", "displayName": "All Employees"},
-            ]
-        elif "/users/" in endpoint and method == "GET" and "/licenseDetails" in endpoint:
-            return [
-                {"skuId": "sku1", "skuPartNumber": "ENTERPRISEPACK", "servicePlans": [{"servicePlanName": "EXCHANGE_S_ENTERPRISE", "provisioningStatus": "Success"}]},
-            ]
-        elif "/users/" in endpoint and method == "GET":
-            return {
-                "id": "user123",
-                "userPrincipalName": "jsmith@company.com",
-                "displayName": "John Smith",
-                "jobTitle": "IT Support Specialist",
-                "department": "Information Technology",
-                "officeLocation": "Building A",
-                "mobilePhone": "+1-555-0123",
-                "accountEnabled": True,
+        try:
+            # Get access token
+            credential = ClientSecretCredential(
+                tenant_id=self.tenant_id,
+                client_id=self.client_id,
+                client_secret=settings.GRAPH_CLIENT_SECRET
+            )
+            token = await credential.get_token("https://graph.microsoft.com/.default")
+            
+            # Make API call
+            url = f"https://graph.microsoft.com/v1.0{endpoint}"
+            headers = {
+                "Authorization": f"Bearer {token.token}",
+                "Content-Type": "application/json"
             }
-        elif method == "POST" and "/users" == endpoint:
-            return {"id": "newuser123", **data}
-        elif "/subscribedSkus" in endpoint:
-            return [
-                {"skuId": "sku1", "skuPartNumber": "ENTERPRISEPACK"},
-                {"skuId": "sku2", "skuPartNumber": "SPE_E3"},
-            ]
-        elif "/groups" in endpoint and method == "GET" and "members" in endpoint:
-            return [
-                {"id": "user1", "displayName": "User One", "@odata.type": "#microsoft.graph.user"},
-                {"id": "user2", "displayName": "User Two", "@odata.type": "#microsoft.graph.user"},
-            ]
-        elif "/auditLogs/signIns" in endpoint:
-            return [
-                {
-                    "createdDateTime": "2025-11-24T10:00:00Z",
-                    "appDisplayName": "Office 365",
-                    "status": {"errorCode": 0},
-                    "location": {"city": "Seattle", "countryOrRegion": "US"},
-                    "deviceDetail": {"operatingSystem": "Windows 10", "browser": "Chrome"},
-                    "ipAddress": "192.168.1.1",
-                }
-            ]
-        elif "/identity/conditionalAccess/policies" in endpoint:
-            return [
-                {
-                    "id": "policy1",
-                    "displayName": "Require MFA for All Users",
-                    "state": "enabled",
-                    "conditions": {"users": {"includeUsers": ["All"]}},
-                    "grantControls": {"builtInControls": ["mfa"]},
-                }
-            ]
-        
-        return {}
+            
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                if method == "GET":
+                    response = await client.get(url, headers=headers, params=params)
+                elif method == "POST":
+                    response = await client.post(url, headers=headers, json=data)
+                elif method == "PATCH":
+                    response = await client.patch(url, headers=headers, json=data)
+                elif method == "DELETE":
+                    response = await client.delete(url, headers=headers)
+                else:
+                    raise ValueError(f"Unsupported HTTP method: {method}")
+                
+                response.raise_for_status()
+                
+                # Handle empty responses
+                if response.status_code == 204:
+                    return None
+                
+                result = response.json()
+                
+                # Handle paged responses
+                if isinstance(result, dict) and "value" in result:
+                    return result["value"]
+                
+                return result
+                
+        except httpx.HTTPStatusError as e:
+            logger.error(f"Graph API HTTP error: {e.response.status_code} - {e.response.text}")
+            raise Exception(f"Graph API error: {e.response.status_code}")
+        except Exception as e:
+            logger.error(f"Graph API call failed: {e}")
+            raise

@@ -406,42 +406,52 @@ class IntuneTool:
             return f"Failed to deploy application: {str(e)}"
     
     async def _intune_call(self, method: str, endpoint: str, data: Optional[Dict] = None) -> Any:
-        """Make Intune API call via Microsoft Graph."""
-        # Placeholder - in production use actual Graph API
-        await asyncio.sleep(0.1)
+        """Make Intune API call via Microsoft Graph (Intune uses Graph API)."""
+        import httpx
+        from azure.identity.aio import ClientSecretCredential
         
-        # Simulate responses
-        if "/managedDevices?" in endpoint and method == "GET":
-            return [{
-                "id": "device123",
-                "deviceName": "LAPTOP-001",
-                "serialNumber": "SN12345",
-                "manufacturer": "Dell",
-                "model": "Latitude 5420",
-                "operatingSystem": "Windows",
-                "osVersion": "10.0.22631",
-                "enrolledDateTime": "2025-01-15T10:00:00Z",
-                "lastSyncDateTime": "2025-11-24T09:00:00Z",
-                "managementState": "managed",
-                "managedDeviceOwnerType": "company",
-                "userPrincipalName": "jsmith@company.com",
-                "userDisplayName": "John Smith",
-                "complianceState": "compliant",
-            }]
-        elif "/deviceCompliancePolicyStates" in endpoint:
-            return [{
-                "displayName": "Windows 10 Security Baseline",
-                "state": "compliant",
-                "version": "1.0",
-            }]
-        elif "/detectedApps" in endpoint:
-            return [
-                {"displayName": "Microsoft Office 365", "version": "16.0.17328", "publisher": "Microsoft", "sizeInByte": 2147483648},
-                {"displayName": "Google Chrome", "version": "120.0.6099", "publisher": "Google", "sizeInByte": 314572800},
-            ]
-        elif "/mobileApps?" in endpoint and method == "GET":
-            return [{"id": "app123", "displayName": "Microsoft Teams"}]
-        elif method == "POST":
-            return {"success": True}
-        
-        return []
+        try:
+            # Get access token for Graph API (Intune uses Graph)
+            credential = ClientSecretCredential(
+                tenant_id=self.tenant_id,
+                client_id=settings.GRAPH_CLIENT_ID,
+                client_secret=settings.GRAPH_CLIENT_SECRET
+            )
+            token = await credential.get_token("https://graph.microsoft.com/.default")
+            
+            # Make API call
+            url = f"https://graph.microsoft.com/v1.0{endpoint}"
+            headers = {
+                "Authorization": f"Bearer {token.token}",
+                "Content-Type": "application/json"
+            }
+            
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                if method == "GET":
+                    response = await client.get(url, headers=headers)
+                elif method == "POST":
+                    response = await client.post(url, headers=headers, json=data)
+                elif method == "DELETE":
+                    response = await client.delete(url, headers=headers)
+                else:
+                    raise ValueError(f"Unsupported method: {method}")
+                
+                response.raise_for_status()
+                
+                if response.status_code == 204:
+                    return {"success": True}
+                
+                result = response.json()
+                
+                # Handle paged responses
+                if isinstance(result, dict) and "value" in result:
+                    return result["value"]
+                
+                return result
+                
+        except httpx.HTTPStatusError as e:
+            logger.error(f"Intune API HTTP error: {e.response.status_code} - {e.response.text}")
+            raise Exception(f"Intune API error: {e.response.status_code}")
+        except Exception as e:
+            logger.error(f"Intune API call failed: {e}")
+            raise

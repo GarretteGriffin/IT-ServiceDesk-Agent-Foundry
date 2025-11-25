@@ -416,15 +416,36 @@ $results | Format-Table -AutoSize | Out-String
     
     async def _execute_powershell(self, script: str) -> str:
         """
-        Execute PowerShell script via Azure Automation or PowerShell remoting
+        Execute PowerShell script via subprocess
         
-        In production, this would:
-        1. Use Azure Automation Runbook for secure execution
-        2. Or use PowerShell remoting with proper authentication
-        3. Validate and sanitize inputs
-        4. Log execution for audit trail
+        Security notes:
+        - Input validation done before calling this
+        - Runs with current user credentials
+        - For production: Use Azure Automation Runbook or constrained endpoint
         """
-        # Placeholder - in production use Azure Automation API
-        await asyncio.sleep(0.1)  # Simulate API call
+        import subprocess
+        import asyncio
         
-        return "PowerShell execution result (placeholder)"
+        try:
+            # Execute PowerShell script
+            process = await asyncio.create_subprocess_exec(
+                'powershell.exe',
+                '-NoProfile',
+                '-NonInteractive',
+                '-ExecutionPolicy', 'Bypass',
+                '-Command', script,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE
+            )
+            
+            stdout, stderr = await process.communicate()
+            
+            if process.returncode != 0:
+                error_msg = stderr.decode('utf-8').strip()
+                raise Exception(f"PowerShell execution failed: {error_msg}")
+            
+            return stdout.decode('utf-8').strip()
+            
+        except Exception as e:
+            logger.error(f"PowerShell execution error: {e}")
+            raise

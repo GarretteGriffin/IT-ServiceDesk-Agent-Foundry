@@ -410,24 +410,51 @@ class ServiceNowTool:
     
     async def _api_call(self, method: str, endpoint: str, params: Optional[Dict] = None, data: Optional[Dict] = None) -> Any:
         """
-        Make ServiceNow REST API call
-        
-        In production:
-        1. Use httpx or aiohttp for async requests
-        2. Handle OAuth2 authentication
-        3. Implement retry logic
-        4. Rate limiting
-        5. Error handling
+        Make ServiceNow REST API call with real httpx client
         """
-        # Placeholder - in production use actual ServiceNow API
-        await asyncio.sleep(0.1)
+        import httpx
+        import base64
         
-        # Simulate response
-        if method == "GET":
-            return [{"number": "INC0010001", "short_description": "Test incident", "state": "2", "priority": "3"}]
-        elif method == "POST":
-            return {"number": "INC0010002", "sys_id": "abc123"}
-        elif method == "PATCH":
-            return {"success": True}
-        
-        return {}
+        try:
+            # Build URL
+            url = f"https://{self.instance}.service-now.com{endpoint}"
+            
+            # Basic auth or OAuth
+            if hasattr(settings, 'SERVICENOW_USERNAME') and settings.SERVICENOW_USERNAME:
+                # Basic auth
+                credentials = f"{settings.SERVICENOW_USERNAME}:{settings.SERVICENOW_PASSWORD}"
+                encoded = base64.b64encode(credentials.encode()).decode()
+                headers = {
+                    "Authorization": f"Basic {encoded}",
+                    "Content-Type": "application/json",
+                    "Accept": "application/json"
+                }
+            else:
+                # OAuth2 (client credentials)
+                raise NotImplementedError("OAuth2 for ServiceNow not yet implemented - use basic auth")
+            
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                if method == "GET":
+                    response = await client.get(url, headers=headers, params=params)
+                elif method == "POST":
+                    response = await client.post(url, headers=headers, json=data)
+                elif method == "PATCH":
+                    response = await client.patch(url, headers=headers, json=data)
+                else:
+                    raise ValueError(f"Unsupported method: {method}")
+                
+                response.raise_for_status()
+                result = response.json()
+                
+                # ServiceNow wraps responses in 'result'
+                if isinstance(result, dict) and "result" in result:
+                    return result["result"]
+                
+                return result
+                
+        except httpx.HTTPStatusError as e:
+            logger.error(f"ServiceNow API HTTP error: {e.response.status_code} - {e.response.text}")
+            raise Exception(f"ServiceNow API error: {e.response.status_code}")
+        except Exception as e:
+            logger.error(f"ServiceNow API call failed: {e}")
+            raise
