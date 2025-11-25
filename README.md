@@ -2,27 +2,31 @@
 
 [![Azure AI Foundry](https://img.shields.io/badge/Azure%20AI%20Foundry-Agent-0078D4)](https://ai.azure.com/)
 [![Python](https://img.shields.io/badge/Python-3.11+-blue)](https://www.python.org/)
-[![License](https://img.shields.io/badge/License-Proprietary-red)](LICENSE)
+[![Security Hardened](https://img.shields.io/badge/Security-Hardened-green)](docs/SECURITY.md)
 
-**Enterprise-grade AI agent built on Azure AI Foundry for comprehensive IT operations**
+**AI agent for IT operations using Azure AI Foundry with custom tools and security controls**
 
-Production-ready IT Service Desk agent with advanced automation capabilities, built using Azure AI Agent Framework, custom tools for Active Directory, PowerShell execution, and integration with enterprise systems.
+This agent automates IT Service Desk operations through integrations with Active Directory, Microsoft Graph, Intune, ServiceNow, and PowerShell execution via Azure Automation.
+
+## ⚠️ Current Status: DEVELOPMENT / TESTING ONLY
+
+**DO NOT deploy to production without:**
+1. Completing security review (see [Security Checklist](#security-checklist))
+2. Implementing RBAC for per-user permissions
+3. Running full test suite against prod-like environment
+4. Conducting penetration testing on all tool integrations
+5. Setting up audit log monitoring and alerting
 
 ---
 
-## 🚀 Why Azure AI Foundry?
+## Architecture
 
-Unlike Copilot Studio, Azure AI Foundry provides:
-
-- ✅ **Custom Function/Tool Support** - Build any capability you need
-- ✅ **Production-Grade Deployment** - Azure Container Apps, Kubernetes, or App Service
-- ✅ **Advanced RAG** - Azure AI Search integration with semantic ranking
-- ✅ **Model Flexibility** - Use any model (GPT-5, o3, o4-mini, Phi-4, custom models)
-- ✅ **Full Code Control** - Python/C# with complete customization
-- ✅ **Enterprise Security** - Managed Identity, Key Vault, VNet integration
-- ✅ **Scalability** - Auto-scaling, load balancing, global distribution
-- ✅ **Observability** - Application Insights, tracing, metrics
-- ✅ **CI/CD Integration** - Azure DevOps, GitHub Actions
+Azure AI Foundry provides:
+- Custom tool development (vs limited connectors in Copilot Studio)
+- Flexible deployment options (Container Apps, AKS, App Service)
+- Full code control with Python/C#
+- Model choice (GPT-5, o3, o4-mini, etc.)
+- Enterprise security (Managed Identity, Key Vault, VNet)
 
 ---
 
