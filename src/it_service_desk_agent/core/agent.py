@@ -1,8 +1,34 @@
 """Agent protocol - every agent must implement this, no exceptions"""
 
 from abc import ABC, abstractmethod
-from typing import List
+from typing import List, Dict, Any
 from .models import AgentRequest, AgentResponse
+
+
+class AgentCapability:
+    """
+    Describes a tool/capability the agent can use
+    
+    Used for:
+    - Prompt construction (showing available tools)
+    - Documentation generation
+    - Capability discovery
+    """
+    
+    def __init__(
+        self,
+        name: str,
+        description: str,
+        input_schema: Dict[str, Any],
+        output_schema: Dict[str, Any] | None = None
+    ):
+        self.name = name
+        self.description = description
+        self.input_schema = input_schema
+        self.output_schema = output_schema or {}
+    
+    def __repr__(self) -> str:
+        return f"AgentCapability(name={self.name!r})"
 
 
 class Agent(ABC):
@@ -36,6 +62,22 @@ class Agent(ABC):
         - "servicenow.incident.create"
         
         Router uses this for dispatch. Declare everything you handle.
+        """
+        ...
+    
+    @property
+    @abstractmethod
+    def capabilities(self) -> List[AgentCapability]:
+        """
+        Structured list of tools/capabilities available to this agent
+        
+        Used for:
+        - Building prompts that describe available tools
+        - Documentation generation
+        - API schema generation
+        
+        Return empty list if agent has no discrete capabilities
+        (e.g., pure LLM-based agents without tools).
         """
         ...
     
