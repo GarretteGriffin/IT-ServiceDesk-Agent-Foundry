@@ -165,6 +165,9 @@ class IdentityAgent(Agent):
         if not username:
             raise ValueError("username parameter required")
         
+        include_groups = request.parameters.get("include_groups", False)
+        include_licenses = request.parameters.get("include_licenses", False)
+        
         # User lookup is low-risk, no authorization needed
         # Just audit for compliance
         AuditLogger.log_operation(
@@ -175,25 +178,43 @@ class IdentityAgent(Agent):
         )
         
         # Query both AD and Azure AD
-        # (In real implementation, call actual tools)
+        try:
+            ad_info = await self._ad.get_user_info(username, include_groups=include_groups)
+        except Exception as e:
+            ad_info = {"error": str(e), "source": "Active Directory"}
+        
+        try:
+            # Convert username to UPN if needed
+            upn = username if "@" in username else f"{username}@{self._ad._domain}"
+            azure_info = await self._graph.get_user_profile(
+                upn,
+                include_groups=include_groups,
+                include_licenses=include_licenses
+            )
+        except Exception as e:
+            azure_info = {"error": str(e), "source": "Azure AD"}
+        
         return {
             "username": username,
-            "message": "User lookup - tools not yet wired in PHASE 6-7"
+            "active_directory": ad_info,
+            "azure_ad": azure_info
         }
     
     async def _handle_password_reset(self, request: AgentRequest) -> Dict[str, Any]:
         """Handle password reset (requires authorization)"""
         username = request.parameters.get("username")
-        if not username:
-            raise ValueError("username parameter required")
+        temporary_password = request.parameters.get("temporary_password")
+        must_change = request.parameters.get("must_change", True)
+        
+        if not username or not temporary_password:
+            raise ValueError("username and temporary_password parameters required")
         
         # ENFORCE AUTHORIZATION
         authorize("identity.password.reset", request.context)
         
         try:
             # Call AD tool to reset password
-            # (In real implementation)
-            result = {"username": username, "status": "password_reset_placeholder"}
+            result = await self._ad.reset_password(username, temporary_password, must_change)
             
             # AUDIT SUCCESS
             AuditLogger.log_operation(
@@ -225,7 +246,7 @@ class IdentityAgent(Agent):
         authorize("identity.account.unlock", request.context)
         
         try:
-            result = {"username": username, "status": "account_unlock_placeholder"}
+            result = await self._ad.unlock_account(username)
             
             AuditLogger.log_operation(
                 event_type=AuditEventType.ACCOUNT_UNLOCK,
@@ -251,27 +272,41 @@ class IdentityAgent(Agent):
         if not username:
             raise ValueError("username parameter required")
         
-        # Query Graph for user's devices
-        return {"username": username, "devices": "placeholder"}
+        # Query AD for computers managed by user
+        try:
+            computers = await self._ad.get_user_computers(username)
+            return {
+                "username": username,
+                "computers": computers,
+                "count": len(computers)
+            }
+        except Exception as e:
+            return {
+                "username": username,
+                "error": str(e),
+                "computers": []
+            }
     
     async def _handle_license_assign(self, request: AgentRequest) -> Dict[str, Any]:
         """Handle license assignment"""
         username = request.parameters.get("username")
-        sku = request.parameters.get("sku")
+        sku_id = request.parameters.get("sku_id")
         
-        if not username or not sku:
-            raise ValueError("username and sku parameters required")
+        if not username or not sku_id:
+            raise ValueError("username and sku_id parameters required")
         
         authorize("identity.license.assign", request.context)
         
         try:
-            result = {"username": username, "sku": sku, "status": "placeholder"}
+            # Convert username to UPN if needed
+            upn = username if "@" in username else f"{username}@{self._ad._domain}"
+            result = await self._graph.assign_license(upn, sku_id)
             
             AuditLogger.log_operation(
                 event_type=AuditEventType.LICENSE_ASSIGN,
                 context=request.context,
                 outcome="success",
-                details={"target_user": username, "sku": sku}
+                details={"target_user": upn, "sku_id": sku_id}
             )
             
             return result
@@ -281,28 +316,30 @@ class IdentityAgent(Agent):
                 event_type=AuditEventType.LICENSE_ASSIGN,
                 context=request.context,
                 error=e,
-                details={"target_user": username, "sku": sku}
+                details={"target_user": username, "sku_id": sku_id}
             )
             raise
     
     async def _handle_license_remove(self, request: AgentRequest) -> Dict[str, Any]:
         """Handle license removal"""
         username = request.parameters.get("username")
-        sku = request.parameters.get("sku")
+        sku_id = request.parameters.get("sku_id")
         
-        if not username or not sku:
-            raise ValueError("username and sku parameters required")
+        if not username or not sku_id:
+            raise ValueError("username and sku_id parameters required")
         
         authorize("identity.license.remove", request.context)
         
         try:
-            result = {"username": username, "sku": sku, "status": "placeholder"}
+            # Convert username to UPN if needed
+            upn = username if "@" in username else f"{username}@{self._ad._domain}"
+            result = await self._graph.remove_license(upn, sku_id)
             
             AuditLogger.log_operation(
                 event_type=AuditEventType.LICENSE_REMOVE,
                 context=request.context,
                 outcome="success",
-                details={"target_user": username, "sku": sku}
+                details={"target_user": upn, "sku_id": sku_id}
             )
             
             return result
@@ -312,6 +349,6 @@ class IdentityAgent(Agent):
                 event_type=AuditEventType.LICENSE_REMOVE,
                 context=request.context,
                 error=e,
-                details={"target_user": username, "sku": sku}
+                details={"target_user": username, "sku_id": sku_id}
             )
             raise

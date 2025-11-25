@@ -118,31 +118,54 @@ def register_default_agents(router: AgentRouter, settings) -> None:
     Args:
         router: Router to register agents with
         settings: Application settings (from config.py)
-    
-    Note:
-        This is a placeholder that will be fully implemented after
-        agents and tools are created in subsequent phases.
     """
     logger.info("Registering default agents...")
     
-    # TODO: Implement agent registration after creating:
-    # - Integration clients (PHASE 5)
-    # - Tool layer (PHASE 6)
-    # - Concrete agents (PHASE 7)
+    # Import integration clients
+    from ..integrations.powershell import PowerShellExecutor
+    from ..integrations.microsoft_graph import MicrosoftGraphClient
+    from ..integrations.servicenow import ServiceNowClient
     
-    # Example (will be implemented):
-    # from ..integrations.powershell import PowerShellExecutor
-    # from ..integrations.microsoft_graph import MicrosoftGraphClient
-    # from ..integrations.servicenow import ServiceNowClient
-    # from ..tools.active_directory import ActiveDirectoryTools
-    # from ..tools.graph_user import GraphUserTools
-    # from ..agents.identity_agent import IdentityAgent
+    # Import tool layers
+    from ..tools.active_directory import ActiveDirectoryTools
+    from ..tools.graph_user import GraphUserTools
+    from ..tools.servicenow_tools import ServiceNowTools
+    from ..tools.intune_tools import IntuneDeviceTools
+    
+    # Import concrete agents
+    from ..agents.identity_agent import IdentityAgent
+    
+    # Instantiate integration clients
+    ps_executor = PowerShellExecutor(base_script_path=settings.ps_script_path)
+    
+    graph_client = MicrosoftGraphClient(
+        tenant_id=settings.graph_tenant_id,
+        client_id=settings.graph_client_id,
+        client_secret=settings.graph_client_secret,
+        base_url=settings.graph_base_url
+    )
+    
+    snow_client = ServiceNowClient(
+        instance_url=settings.snow_instance_url,
+        username=settings.snow_username,
+        password=settings.snow_password
+    )
+    
+    # Instantiate tool layers
+    ad_tools = ActiveDirectoryTools(ps_executor, domain=settings.ad_domain)
+    graph_tools = GraphUserTools(graph_client)
+    snow_tools = ServiceNowTools(snow_client)
+    intune_tools = IntuneDeviceTools(graph_client)
+    
+    # Instantiate and register agents
+    identity_agent = IdentityAgent(ad_tools, graph_tools)
+    router.register_agent(identity_agent)
+    
+    logger.info(f"Registered {len(router.get_available_intents())} intents across agents")
+    
+    # TODO: Add more agents as they're implemented
+    # device_agent = DeviceAgent(intune_tools)
+    # router.register_agent(device_agent)
     #
-    # ps = PowerShellExecutor()
-    # graph = MicrosoftGraphClient(settings)
-    # ad_tools = ActiveDirectoryTools(ps)
-    # graph_tools = GraphUserTools(graph)
-    # identity_agent = IdentityAgent(ad_tools, graph_tools)
-    # router.register_agent(identity_agent)
-    
-    logger.warning("register_default_agents is a placeholder - agents will be added in PHASE 7")
+    # ticket_agent = TicketAgent(snow_tools)
+    # router.register_agent(ticket_agent)

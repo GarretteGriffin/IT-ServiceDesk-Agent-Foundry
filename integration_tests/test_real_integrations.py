@@ -2,12 +2,19 @@
 Real Integration Tests - Actually call APIs
 """
 
+import os
 import pytest
 import asyncio
 from src.tools.active_directory import ADTool
 from src.tools.microsoft_graph import GraphTool
 from src.tools.servicenow import ServiceNowTool
 from src.tools.intune import IntuneTool
+
+# Skip all integration tests unless explicitly enabled
+pytestmark = pytest.mark.skipif(
+    not os.getenv("RUN_INTEGRATION_TESTS"),
+    reason="Integration tests disabled (set RUN_INTEGRATION_TESTS=1 to enable)"
+)
 
 
 class TestRealIntegrations:
