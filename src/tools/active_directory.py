@@ -8,6 +8,8 @@ import asyncio
 from datetime import datetime, timedelta
 
 from src.utils.logging import get_logger
+from src.utils.audit import AuditLogger, OperationType
+from src.utils.validation import InputValidator, ValidationError
 from src.config import settings
 
 logger = get_logger(__name__)
@@ -50,12 +52,14 @@ class ADTool:
         username: Annotated[str, "Username or email address to lookup"],
         include_groups: Annotated[bool, "Include group memberships"] = False,
     ) -> str:
-        """
-        Get detailed information about an Active Directory user.
+        """Get detailed information about an Active Directory user (read-only, safe operation)."""
+        try:
+            username = InputValidator.validate_username(username)
+        except ValidationError as e:
+            return f"✗ Invalid username: {e}"
         
-        Returns user properties, status, and optionally group memberships.
-        """
         logger.info(f"Getting user info for: {username}")
+        AuditLogger.log_operation(OperationType.READ_ONLY, "get_user_info", f"user:{username}")
         
         try:
             # In production: Use ldap3 or PowerShell remoting
